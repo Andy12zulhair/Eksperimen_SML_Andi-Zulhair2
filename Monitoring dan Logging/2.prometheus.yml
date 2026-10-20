@@ -1,0 +1,25 @@
+# Prometheus Configuration for Machine Learning Monitoring
+# Author: Andi Zulhair
+# DICODING SUBMISSION - KRITERIA 4
+
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # Scrape job for Diabetes Risk ML Model Exporter & Serving
+  - job_name: 'diabetes_risk_model_serving'
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['127.0.0.1:8000']
+        labels:
+          app: 'diabetes-risk-ml'
+          env: 'local-serving'
+          student: 'andizulhair'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['127.0.0.1:9090']
