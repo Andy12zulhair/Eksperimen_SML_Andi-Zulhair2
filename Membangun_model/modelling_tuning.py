@@ -163,8 +163,7 @@ def main():
         if os.path.exists(cm_image_path):
             os.remove(cm_image_path)
         
-        print('
-[SUCCESS] Model, parameters, all metrics, and artifacts logged successfully to MLflow / DagsHub!')
+        print('[SUCCESS] Model, parameters, all metrics, and artifacts logged successfully to MLflow / DagsHub!')
 
 if __name__ == '__main__':
     main()
