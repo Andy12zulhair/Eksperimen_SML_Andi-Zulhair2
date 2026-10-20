@@ -1,5 +1,7 @@
 import os
 import sys
+import shutil
+import pickle
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,13 +15,13 @@ from mlflow.models.signature import infer_signature
 from dotenv import load_dotenv
 
 # Ensure UTF-8 output on Windows consoles
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def init_tracking():
     # Load DagsHub Credentials from .env if available
     load_dotenv()
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
+    tracking_uri = os.getenv('MLFLOW_TRACKING_URI')
     
     if tracking_uri:
         mlflow.set_tracking_uri(tracking_uri)
@@ -29,16 +31,16 @@ def init_tracking():
             dagshub.init(repo_owner='Andy12zulhair', repo_name='Submission_andizulhair', mlflow=True)
         except Exception:
             # Fallback to local MLflow tracking server
-            mlflow.set_tracking_uri("http://127.0.0.1:5000/")
+            mlflow.set_tracking_uri('http://127.0.0.1:5000/')
 
 def main():
     init_tracking()
     
     # Set experiment name
-    mlflow.set_experiment("Diabetes_Risk_Tuning_Experiment")
+    mlflow.set_experiment('Diabetes_Risk_Tuning_Experiment')
     
     # Load dataset
-    data_path = os.path.join("diabetes_risk_preprocessing", "diabetes_risk_clean.csv")
+    data_path = os.path.join('diabetes_risk_preprocessing', 'diabetes_risk_clean.csv')
     df = pd.read_csv(data_path)
     
     target_col = 'diabetes_risk'
@@ -54,7 +56,7 @@ def main():
     mlflow.autolog(disable=True)
     
     with mlflow.start_run():
-        print("Starting hyperparameter tuning...")
+        print('Starting hyperparameter tuning...')
         # Define model and parameters for tuning
         base_model = RandomForestClassifier(random_state=42)
         param_grid = {
@@ -76,11 +78,11 @@ def main():
         recall = recall_score(y_test, preds, average='weighted', zero_division=0)
         f1 = f1_score(y_test, preds, average='weighted', zero_division=0)
         
-        print(f"Best Params: {grid_search.best_params_}")
-        print(f"Accuracy : {accuracy:.4f}")
-        print(f"Precision: {precision:.4f}")
-        print(f"Recall   : {recall:.4f}")
-        print(f"F1-Score : {f1:.4f}")
+        print(f'Best Params: {grid_search.best_params_}')
+        print(f'Accuracy : {accuracy:.4f}')
+        print(f'Precision: {precision:.4f}')
+        print(f'Recall   : {recall:.4f}')
+        print(f'F1-Score : {f1:.4f}')
         
         # -----------------------------
         # MANUAL LOGGING (MEMENUHI BASIC & SKILLED)
@@ -89,38 +91,57 @@ def main():
         mlflow.log_params(grid_search.best_params_)
         
         # 2. Log Metrics (Minimal accuracy, precision, recall, f1)
-        mlflow.log_metric("accuracy", accuracy)
-        mlflow.log_metric("precision", precision)
-        mlflow.log_metric("recall", recall)
-        mlflow.log_metric("f1_score", f1)
+        mlflow.log_metric('accuracy', accuracy)
+        mlflow.log_metric('precision', precision)
+        mlflow.log_metric('recall', recall)
+        mlflow.log_metric('f1_score', f1)
         
         # 3. Model Signature & Input Example
         signature = infer_signature(X_train, preds)
         input_example = X_train.head(3)
         
-        # 4. Log Model Artifact in "model" folder
-        # Ini akan menghasilkan folder model/ yang berisi MLmodel, model.pkl, conda.yaml, requirements.txt
+        # 4. Log Model via MLflow Model Logging
         mlflow.sklearn.log_model(
             sk_model=best_model,
-            artifact_path="model",
+            artifact_path='model',
             signature=signature,
             input_example=input_example,
             skops_trusted_types=[
-                "sklearn.tree._tree.Tree",
-                "sklearn.tree._classes.DecisionTreeClassifier",
-                "sklearn.ensemble._forest.RandomForestClassifier",
+                'sklearn.tree._tree.Tree',
+                'sklearn.tree._classes.DecisionTreeClassifier',
+                'sklearn.ensemble._forest.RandomForestClassifier',
             ]
         )
-        print("Logged model artifact into 'model/' folder with signature & input_example")
+        
+        # 4b. Explicitly save & log model folder directly into run artifacts (so 'model/' appears in run artifacts tab)
+        temp_model_dir = 'temp_model_artifacts'
+        if os.path.exists(temp_model_dir):
+            shutil.rmtree(temp_model_dir)
+        mlflow.sklearn.save_model(
+            sk_model=best_model,
+            path=temp_model_dir,
+            signature=signature,
+            input_example=input_example,
+            skops_trusted_types=[
+                'sklearn.tree._tree.Tree',
+                'sklearn.tree._classes.DecisionTreeClassifier',
+                'sklearn.ensemble._forest.RandomForestClassifier',
+            ]
+        )
+        with open(os.path.join(temp_model_dir, 'model.pkl'), 'wb') as f_pkl:
+            pickle.dump(best_model, f_pkl)
+        mlflow.log_artifacts(temp_model_dir, artifact_path='model')
+        shutil.rmtree(temp_model_dir)
+        print('Logged model artifacts directly to run artifacts: model/')
         
         # 5. Artifact Tambahan 1: Feature Importances
         importances = best_model.feature_importances_
         fi_df = pd.DataFrame({'feature': X.columns, 'importance': importances})
         fi_df = fi_df.sort_values(by='importance', ascending=False)
-        fi_csv_path = "feature_importance.csv"
+        fi_csv_path = 'feature_importance.csv'
         fi_df.to_csv(fi_csv_path, index=False)
         mlflow.log_artifact(fi_csv_path)
-        print("Logged artifact: feature_importance.csv")
+        print('Logged artifact: feature_importance.csv')
         
         # 6. Artifact Tambahan 2: Confusion Matrix Image
         cm = confusion_matrix(y_test, preds)
@@ -130,11 +151,11 @@ def main():
         plt.xlabel('Predicted')
         plt.ylabel('Actual')
         plt.tight_layout()
-        cm_image_path = "confusion_matrix.png"
+        cm_image_path = 'confusion_matrix.png'
         plt.savefig(cm_image_path)
         plt.close()
         mlflow.log_artifact(cm_image_path)
-        print("Logged artifact: confusion_matrix.png")
+        print('Logged artifact: confusion_matrix.png')
         
         # Cleanup temporary local image/csv
         if os.path.exists(fi_csv_path):
@@ -142,7 +163,8 @@ def main():
         if os.path.exists(cm_image_path):
             os.remove(cm_image_path)
         
-        print("\n[SUCCESS] Model, parameters, all metrics, and artifacts logged successfully to MLflow / DagsHub!")
+        print('
+[SUCCESS] Model, parameters, all metrics, and artifacts logged successfully to MLflow / DagsHub!')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
